@@ -48,21 +48,21 @@ def build_cloth_edges():
         
     edges_ = edges_[np.argsort(edges_[:,0])]
     first_edge_ind = edges_[0, 0]
-    second_edges_set = set()
-    second_edges_set.add(edges_[0, 1])
+    second_edge_set = set()
+    second_edge_set.add(edges_[0, 1])
     
     pick_edges = [[edges_[0, 0], edges_[0, 1]]]
     
     for edge in edges_:
         if (edge[0] == first_edge_ind):
-            if (edge[1] in second_edges_set):
+            if (edge[1] in second_edge_set):
                 continue
             pick_edges.append([edge[0], edge[1]])
-            second_edges_set.add(edge[1])
+            second_edge_set.add(edge[1])
         else:
             first_edge_ind = edge[0]
-            second_edges_set.clear()
-            second_edges_set.add(edge[1])
+            second_edge_set.clear()
+            second_edge_set.add(edge[1])
             pick_edges.append([edge[0], edge[1]])
     
     for i in range(w - 1):
@@ -89,7 +89,7 @@ pos_new = ti.Vector.field(n = 2, dtype = ti.f32, shape = nparticles)
 sum_num = ti.field(ti.f32, shape = nparticles)
 ############################## Taichi Var Define ##############################
 
-@ti.kernel
+@ti.func
 def para_init_cloth():
     wlength = w - 1
     hlength = h - 1
@@ -99,35 +99,36 @@ def para_init_cloth():
         cloth_vel[i][0] = 0.0
         cloth_vel[i][1] = 0.0
 
-@ti.kernel
+@ti.func
 def para_init_restlength():
     for i in rest_length:
         v0 = cloth_edge[i][0]
         v1 = cloth_edge[i][1]
         dx = cloth_pos[v0] - cloth_pos[v1]
         rest_length[i] = dx.norm()
-
+        
 @ti.kernel
 def init_force_params():
     external[0] = ti.Vector([0.0,  0.0])
     gravity[0]  = ti.Vector([0.0, -9.8])
 
+@ti.kernel
 def build_cloth_model():
     para_init_cloth()
     para_init_restlength()
     
-    
-def epoch_init_dump_variable():
+
+def init_dump_variable():
     pos_new.fill(0)
     sum_num.fill(0)
     pos_old.copy_from(cloth_pos)
     
-@ti.kernel
+
 def update_external_force(fx : ti.f32, fy : ti.f32):
     external[0] = ti.Vector([fx, fy])
     
 @ti.func
-def fix_close_point():
+def fix_cloth_point():
     # Fix Two Point 
     cloth_pos[nparticles - w] = pos_old[nparticles - w]
     cloth_pos[nparticles - 1] = pos_old[nparticles - 1]
@@ -139,9 +140,9 @@ def para_step():
         cloth_vel[i] *= dumping
         cloth_pos[i] += cloth_vel[i] * dt
     
-@ti.kernel
+@ti.func
 def para_projection():
-    fix_close_point()
+    fix_cloth_point()
     for i in cloth_edge:
         v0 = cloth_edge[i][0]
         v1 = cloth_edge[i][1]
@@ -152,30 +153,31 @@ def para_projection():
         sum_num[v0] += 1
         sum_num[v1] += 1
     
-@ti.kernel
+@ti.func
 def para_correct():
     for i in cloth_pos:
         pos_tmp[0]    = (pos_new[i] + cloth_pos[i] * alpha) / (sum_num[i] + alpha) 
         cloth_vel[i] += (pos_tmp[0] - cloth_pos[i]) / dt
         cloth_pos[i]  = pos_tmp[0]
-    fix_close_point()
+    fix_cloth_point()
     
-
+@ti.kernel
+def simulator_kernel():
+    para_projection()
+    para_correct()
+        
 def init_simulator():
     init_force_params()
     build_cloth_model()
-    
 
 def run_simulator():
-    epoch_init_dump_variable()
+    init_dump_variable()
     para_step()
     for k in range(niterator):
-        para_projection()
-        para_correct()
+        simulator_kernel()
     # debug_arr = external.to_numpy()
     # print(debug_arr)
     
-
 def draw_cloth_mesh_to_screen(pos):
     # scale transform
     pos[:,0] *= padding
@@ -196,14 +198,12 @@ def handle_mouse_event():
     if not isMouseLeftButtonHandle[None]:
         isMouseLeftButtonHandle[None] = 1
         mouse_last_x[None], mouse_last_y[None] = gui.get_cursor_pos()
-        
     else:
         mouse_x, mouse_y = gui.get_cursor_pos()
         update_external_force(
             10 * (mouse_x - mouse_last_x[None]), 
             10 * (mouse_y - mouse_last_y[None]))
         
-
 def main():
     
     init_simulator()
@@ -220,7 +220,7 @@ def main():
         else:
             update_external_force(0, 0)
             isMouseLeftButtonHandle[None] = 0
-                
+
         draw_cloth_mesh_to_screen(cloth_pos.to_numpy())
         if not isPaused[None]:
             run_simulator()
