@@ -30,7 +30,6 @@ mouse_last_x = ti.field(dtype=ti.f32, shape=())
 mouse_last_y = ti.field(dtype=ti.f32, shape=())
 gui = ti.GUI('Position-based Dynamics Demo', res = (res_w, res_h), background_color = 0xDDDDDD)
 
-ball_pos, ball_radius = ti.Vector([0.5, 0.0]), 0.32
 ############################## Taichi Var Define ##############################
 cloth_tri  = ti.field(ti.i32, shape = (ntriangles    , 3))
 cloth_edge = ti.field(ti.i32, shape = (ntriangles * 3, 2))
@@ -42,11 +41,9 @@ cloth_vel  = ti.Vector.field(n = 2, dtype = ti.f32, shape = nparticles)
 dm_inv     = ti.Matrix.field(n = 2, m = 2, dtype = ti.f32, shape = ntriangles)
 tri_area   = ti.field(ti.f32, shape = ntriangles)
 
-# rest_length = ti.field(ti.f32, shape = nedges)
 # dump variable
 particle_force = ti.Vector.field(n = 2, dtype = ti.f32, shape = nparticles)
 pos_old = ti.Vector.field(n = 2, dtype = ti.f32, shape = nparticles)
-
 ############################## Taichi Var Define ##############################
 
 
