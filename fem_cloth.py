@@ -16,6 +16,7 @@ ntriangles = (w-1) * (h-1) * 2
 isPaused    = ti.field(dtype=ti.i32, shape=())
 dt          = 0.0005
 damping     = 1.5
+# ref:https://en.wikipedia.org/wiki/Neo-Hookean_solid
 E, nu = 4e4, 0.2  # Young's modulus and Poisson's ratio
 mu, lam = E / 2 / (1 + nu), E * nu / (1 + nu) / (1 - 2 * nu)  # Lame parameters
 internal_force_aux_scalar = 1 / 8
@@ -169,6 +170,7 @@ def para_epoch_fem_kernel():
         
         F = ti.Matrix.cols([x10, x20]) @ dm_inv[i]
         
+        # potential energy of each face (Neo-Hookean)
         F_it =  F.inverse().transpose()                              # Important
         PF = mu * (F - F_it) + lam * ti.log(F.determinant()) * F_it  # Important
         H = -tri_area[i]* PF @ dm_inv[i].transpose()                 # Important
